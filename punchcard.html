@@ -1,0 +1,694 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Station Punch</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<style>
+  :root {
+    --bg: #14181c; --panel: #1e242a; --panel-alt: #262e36; --border: #313a42;
+    --text: #f2f0ea; --text-dim: #97a1ab; --accent: #f5a623; --accent-text: #1b1300;
+    --in: #2bb673; --out: #e4572e; --focus: #6cb4ff;
+  }
+  @media (prefers-color-scheme: light) {
+    :root:not([data-theme="dark"]) {
+      --bg:#f4f2ed; --panel:#fff; --panel-alt:#f0eee8; --border:#ddd8ce;
+      --text:#1b1f23; --text-dim:#5c6670; --accent:#d98a1e; --accent-text:#1b1300;
+      --in:#1f9d63; --out:#c44b26;
+    }
+  }
+  :root[data-theme="light"] {
+    --bg:#f4f2ed; --panel:#fff; --panel-alt:#f0eee8; --border:#ddd8ce;
+    --text:#1b1f23; --text-dim:#5c6670; --accent:#d98a1e; --accent-text:#1b1300;
+    --in:#1f9d63; --out:#c44b26;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Inter', system-ui, sans-serif; min-height: 100vh; -webkit-font-smoothing: antialiased; }
+  h1, h2, h3, .num { font-family: 'Space Grotesk', system-ui, sans-serif; }
+  button { font-family: inherit; cursor: pointer; }
+  button:focus-visible, input:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+  .topbar { display: flex; align-items: center; justify-content: space-between; padding: 14px 20px; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: var(--bg); z-index: 10; }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 600; font-size: 15px; }
+  .brand .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 20%, transparent); }
+  .conn-badge { font-size: 11px; padding: 3px 8px; border-radius: 999px; margin-left: 10px; }
+  .conn-badge.ok { background: color-mix(in srgb, var(--in) 22%, transparent); color: var(--in); }
+  .conn-badge.bad { background: color-mix(in srgb, var(--out) 22%, transparent); color: var(--out); }
+  .tabs { display: flex; gap: 4px; background: var(--panel-alt); padding: 3px; border-radius: 10px; border: 1px solid var(--border); }
+  .tab { border: none; background: transparent; color: var(--text-dim); padding: 7px 16px; border-radius: 7px; font-size: 13px; font-weight: 600; }
+  .tab.active { background: var(--panel); color: var(--text); box-shadow: 0 1px 2px rgba(0,0,0,0.15); }
+
+  .wrap { max-width: 720px; margin: 0 auto; padding: 28px 18px 60px; }
+  .wrap.wide { max-width: 1000px; }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 22px; }
+  .card + .card { margin-top: 16px; }
+
+  .worker-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; margin-top: 16px; }
+  .worker-tile { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 16px 10px; display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center; }
+  .worker-tile:hover { border-color: var(--accent); }
+  .avatar { width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 15px; color: var(--accent-text); background: var(--accent); flex-shrink: 0; }
+  .worker-tile .name { font-size: 13px; font-weight: 500; }
+  .worker-tile .status { font-size: 11px; color: var(--text-dim); }
+  .worker-tile .status.over-limit { color: var(--out); font-weight: 600; }
+
+  .flow-header { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; }
+  .back-btn { background: var(--panel-alt); border: 1px solid var(--border); color: var(--text); border-radius: 8px; padding: 7px 11px; font-size: 13px; }
+  .step-dots { display: flex; gap: 6px; margin-left: auto; }
+  .step-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--border); }
+  .step-dot.done { background: var(--accent); }
+
+  .punch-cta { width: 100%; padding: 22px; border-radius: 14px; border: none; font-family: 'Space Grotesk', sans-serif; font-size: 20px; font-weight: 600; margin-top: 18px; }
+  .punch-cta.in { background: var(--in); color: #06210f; }
+  .punch-cta.out { background: var(--out); color: #2a0d02; }
+  .punch-cta.break { background: var(--accent); color: var(--accent-text); }
+  .punch-cta:disabled { opacity: 0.5; }
+
+  .choice-row { display: flex; flex-direction: column; gap: 10px; margin-top: 18px; }
+
+  video { width: 100%; border-radius: 12px; background: #000; display: block; }
+  .video-box { position: relative; border-radius: 12px; overflow: hidden; }
+  .video-box.mirror video { transform: scaleX(-1); }
+
+  .field-row { display: flex; gap: 8px; }
+  input[type=text] { flex: 1; background: var(--panel-alt); border: 1px solid var(--border); color: var(--text); border-radius: 8px; padding: 10px 12px; font-size: 14px; }
+  .btn { background: var(--panel-alt); border: 1px solid var(--border); color: var(--text); border-radius: 8px; padding: 10px 16px; font-size: 13.5px; font-weight: 600; }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
+  .btn.danger { background: transparent; border-color: var(--out); color: var(--out); }
+  .btn.ghost { background: transparent; }
+  .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+  .btn.small { padding: 6px 11px; font-size: 12px; }
+
+  .shutter-row { display: flex; justify-content: center; align-items: center; gap: 18px; margin-top: 18px; }
+  .shutter { width: 62px; height: 62px; border-radius: 50%; border: 3px solid var(--text); background: transparent; position: relative; }
+  .shutter::after { content: ''; position: absolute; inset: 6px; border-radius: 50%; background: var(--text); }
+
+  .confirm-summary { display: flex; gap: 14px; align-items: center; background: var(--panel-alt); border: 1px solid var(--border); border-radius: 12px; padding: 12px; margin-top: 14px; }
+  .confirm-summary img { width: 58px; height: 58px; border-radius: 10px; object-fit: cover; transform: scaleX(-1); }
+  .confirm-summary .meta { font-size: 13px; }
+  .confirm-summary .meta .t { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 17px; }
+
+  .done-check { width: 64px; height: 64px; border-radius: 50%; background: var(--in); display: flex; align-items: center; justify-content: center; margin: 8px auto 4px; animation: pop 0.35s ease; }
+  @keyframes pop { from { transform: scale(0.6); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+  .hint { font-size: 12.5px; color: var(--text-dim); margin-top: 8px; line-height: 1.5; }
+  .center-text { text-align: center; }
+
+  .stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-bottom: 16px; }
+  .stat { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; }
+  .stat .label { font-size: 11.5px; color: var(--text-dim); }
+  .stat .value { font-family: 'Space Grotesk', sans-serif; font-size: 22px; font-weight: 600; margin-top: 3px; }
+
+  .section-title { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+  .section-title h3 { margin: 0; font-size: 15px; }
+
+  .staff-list { display: flex; flex-direction: column; gap: 8px; }
+  .staff-row { display: flex; align-items: center; gap: 10px; padding: 9px 10px; background: var(--panel-alt); border: 1px solid var(--border); border-radius: 10px; }
+  .staff-row .name { flex: 1; font-size: 13.5px; font-weight: 500; }
+  .staff-row.inactive { opacity: 0.5; }
+  .staff-row .tag { font-size: 10.5px; color: var(--text-dim); }
+
+  .table-toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
+  .table-toolbar select { background: var(--panel-alt); border: 1px solid var(--border); color: var(--text); border-radius: 8px; padding: 8px 10px; font-size: 13px; }
+  .table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: 12px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 640px; }
+  th, td { text-align: left; padding: 10px 12px; white-space: nowrap; }
+  thead th { background: var(--panel-alt); color: var(--text-dim); font-weight: 600; font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.04em; position: sticky; top: 0; }
+  tbody tr { border-top: 1px solid var(--border); }
+  .thumb-pair { display: flex; gap: 4px; }
+  .thumb-pair img { width: 26px; height: 26px; border-radius: 6px; object-fit: cover; }
+  .badge { display: inline-block; padding: 3px 9px; border-radius: 999px; font-size: 11px; font-weight: 600; }
+  .badge.ok { background: color-mix(in srgb, var(--in) 22%, transparent); color: var(--in); }
+  .badge.warn { background: color-mix(in srgb, var(--out) 22%, transparent); color: var(--out); }
+  .empty-state { text-align: center; padding: 40px 20px; color: var(--text-dim); font-size: 13.5px; }
+  .footer-note { max-width: 720px; margin: 0 auto; padding: 0 18px 40px; font-size: 12px; color: var(--text-dim); line-height: 1.6; }
+
+  @media (max-width: 520px) {
+    .wrap { padding: 18px 14px 50px; }
+    .topbar { padding: 12px 14px; }
+    .brand span.full { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="brand"><span class="dot"></span><span class="full">Station Punch</span><span class="conn-badge" id="conn-badge">checking…</span></div>
+  <div class="tabs">
+    <button class="tab active" data-tab="kiosk">Kiosk</button>
+    <button class="tab" data-tab="manager">Manager</button>
+  </div>
+</div>
+
+<div id="kiosk-tab" class="wrap"></div>
+<div id="manager-tab" class="wrap wide" style="display:none;"></div>
+<div class="footer-note" id="footer-note"></div>
+
+<script>
+(function(){
+
+// ===================== CONFIGURE THIS =====================
+const SUPABASE_URL = "https://lvhhdrmdhaskxfytfsym.supabase.co";      // e.g. https://xxxx.supabase.co
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx2aGhkcm1kaGFza3hmeXRmc3ltIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTAwMjI3NDAsImV4cCI6MjEwNTU5ODc0MH0.fhno3ZxWuW5YkMuuZEw_Fgugidg6IgvrNoFxpSxqyQQ";
+const MANAGER_PIN = "2327";                             // change this before handing out the link
+const MAX_BREAK_MINUTES = 30;                           // break policy limit — flagged, not enforced by force
+// =============================================================
+// Note: this PIN is checked in the browser, which deters casual access but
+// isn't real security — anyone technical could bypass it via dev tools.
+// For real protection, this would need Supabase Auth + database-level rules.
+
+const hasBackend = SUPABASE_URL.startsWith('http') && SUPABASE_ANON_KEY.length > 20;
+const sb = hasBackend ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
+
+function initials(name){ return name.split(' ').map(p=>p[0]).slice(0,2).join('').toUpperCase(); }
+function placeholderPhoto(name, tint){
+  const c = document.createElement('canvas'); c.width = 200; c.height = 200;
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = tint; ctx.fillRect(0,0,200,200);
+  ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.font = '600 70px sans-serif';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(initials(name), 100, 110);
+  return c.toDataURL('image/jpeg', 0.85);
+}
+function dataUrlToBlob(dataUrl){
+  const [meta, b64] = dataUrl.split(',');
+  const mime = meta.match(/:(.*?);/)[1];
+  const bin = atob(b64);
+  const arr = new Uint8Array(bin.length);
+  for (let i=0;i<bin.length;i++) arr[i] = bin.charCodeAt(i);
+  return new Blob([arr], { type: mime });
+}
+
+// ---------------- Local fallback state (used if Supabase isn't configured yet) ----------------
+// Persisted to localStorage so refreshing the page while testing doesn't wipe your data.
+const LOCAL_STORE_KEY = 'station_punch_demo_v1';
+function loadLocalStore(){
+  try {
+    const raw = localStorage.getItem(LOCAL_STORE_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch(e) { /* fall through to defaults */ }
+  return {
+    workers: [
+      { id: 'w1', name: 'Amirul', active: true },
+      { id: 'w2', name: 'Siti', active: true },
+      { id: 'w3', name: 'Farid', active: true },
+    ],
+    punches: []
+  };
+}
+function saveLocalStore(){
+  try { localStorage.setItem(LOCAL_STORE_KEY, JSON.stringify({ workers: localWorkers, punches: localPunches })); }
+  catch(e) { /* storage unavailable — testing session just won't persist */ }
+}
+const _localStore = loadLocalStore();
+let localWorkers = _localStore.workers;
+let localPunches = _localStore.punches;
+
+let workers = [];
+let punches = [];
+
+// ---------------- Data layer ----------------
+async function loadWorkers(){
+  if (!sb){ workers = localWorkers.filter(w=>w.active); return; }
+  const { data, error } = await sb.from('workers').select('*').eq('active', true).order('name');
+  workers = error ? [] : data;
+}
+async function loadPunches(){
+  if (!sb){ punches = localPunches; return; }
+  const { data, error } = await sb.from('punches').select('*').order('created_at', { ascending: false }).limit(1000);
+  punches = error ? [] : data.map(p => ({ ...p, timestamp: p.created_at, photo: p.photo_url, photoPath: p.photo_path, workerId: p.worker_id, workerName: p.worker_name }));
+}
+async function addWorker(name){
+  if (!sb){ localWorkers.push({ id: 'w'+Date.now(), name, active: true }); saveLocalStore(); await loadWorkers(); renderKioskHome(); renderManager(); return; }
+  const { error } = await sb.from('workers').insert({ name, active: true });
+  if (error) { alert('Could not add staff member: ' + error.message); throw error; }
+}
+async function removeWorker(id){
+  if (!sb){ const w = localWorkers.find(w=>w.id===id); if (w) w.active = false; saveLocalStore(); await loadWorkers(); renderKioskHome(); renderManager(); return; }
+  const { error } = await sb.from('workers').update({ active: false }).eq('id', id);
+  if (error) alert('Could not remove staff member: ' + error.message);
+}
+async function submitPunch(worker, type, photoDataUrl){
+  const now = new Date();
+  if (!sb){
+    localPunches.push({ id: 'p'+Date.now(), workerId: worker.id, workerName: worker.name, type, timestamp: now.toISOString(), photo: photoDataUrl });
+    saveLocalStore();
+    return;
+  }
+  let photoUrl = null, photoPath = null;
+  if (photoDataUrl){
+    try {
+      const blob = dataUrlToBlob(photoDataUrl);
+      const path = `${worker.id}/${Date.now()}.jpg`;
+      const { error: upErr } = await sb.storage.from('selfies').upload(path, blob, { contentType: 'image/jpeg' });
+      if (!upErr) { photoUrl = sb.storage.from('selfies').getPublicUrl(path).data.publicUrl; photoPath = path; }
+    } catch(e) { /* storage optional — punch still records without a photo url */ }
+  }
+  await sb.from('punches').insert({ worker_id: worker.id, worker_name: worker.name, type, photo_url: photoUrl, photo_path: photoPath });
+}
+
+function lastPunchToday(workerId){
+  const today = new Date().toDateString();
+  const todays = punches.filter(p => p.workerId === workerId && new Date(p.timestamp).toDateString() === today);
+  if (!todays.length) return null;
+  return todays.sort((a,b)=> new Date(b.timestamp) - new Date(a.timestamp))[0];
+}
+function workerState(workerId){
+  // walks today's punches in order and returns 'out' | 'in' | 'break'
+  const last = lastPunchToday(workerId);
+  if (!last) return 'out';
+  if (last.type === 'In' || last.type === 'Break End') return 'in';
+  if (last.type === 'Break Start') return 'break';
+  return 'out';
+}
+function stateLabel(workerId){
+  const last = lastPunchToday(workerId);
+  const state = workerState(workerId);
+  if (!last) return 'Not clocked in yet';
+  if (state === 'in') return 'Clocked in';
+  if (state === 'break'){
+    const elapsedMin = Math.floor((Date.now() - new Date(last.timestamp)) / 60000);
+    return elapsedMin > MAX_BREAK_MINUTES
+      ? `On break — ${elapsedMin - MAX_BREAK_MINUTES}m over limit`
+      : `On break — ${MAX_BREAK_MINUTES - elapsedMin}m left`;
+  }
+  return 'Clocked out';
+}
+
+// ---------------- Tabs ----------------
+document.querySelectorAll('.tab').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    const tab = btn.dataset.tab;
+    document.getElementById('kiosk-tab').style.display = tab === 'kiosk' ? '' : 'none';
+    document.getElementById('manager-tab').style.display = tab === 'manager' ? '' : 'none';
+    document.getElementById('footer-note').style.display = tab === 'kiosk' ? '' : 'none';
+    if (tab === 'kiosk') renderKioskHome(); else renderManagerGate();
+  });
+});
+
+function isManagerUnlocked(){
+  try { return sessionStorage.getItem('sp_mgr_unlocked') === '1'; } catch(e){ return false; }
+}
+function setManagerUnlocked(v){
+  try { v ? sessionStorage.setItem('sp_mgr_unlocked','1') : sessionStorage.removeItem('sp_mgr_unlocked'); } catch(e){ /* ignore */ }
+}
+function renderManagerGate(){
+  if (isManagerUnlocked()){ renderManager(); return; }
+  managerEl.innerHTML = `
+    <div class="card" style="max-width:320px;margin:40px auto 0;">
+      <h2 style="margin:0 0 4px;font-size:17px;">Manager access</h2>
+      <div class="hint">Enter the PIN to view staff and attendance data.</div>
+      <div class="field-row" style="margin-top:14px;">
+        <input type="password" inputmode="numeric" id="mgr-pin" placeholder="PIN" maxlength="8">
+        <button class="btn primary" id="mgr-unlock-btn">Unlock</button>
+      </div>
+      <div id="mgr-pin-error" class="hint" style="color:var(--out);display:none;">Incorrect PIN.</div>
+    </div>
+  `;
+  const input = document.getElementById('mgr-pin');
+  const tryUnlock = ()=>{
+    if (input.value === MANAGER_PIN){ setManagerUnlocked(true); renderManager(); }
+    else { document.getElementById('mgr-pin-error').style.display = 'block'; input.value = ''; input.focus(); }
+  };
+  document.getElementById('mgr-unlock-btn').onclick = tryUnlock;
+  input.addEventListener('keydown', e=>{ if (e.key === 'Enter') tryUnlock(); });
+  input.focus();
+}
+
+// ================= KIOSK =================
+const kioskEl = document.getElementById('kiosk-tab');
+let activeStream = null;
+function stopStream(){ if (activeStream){ activeStream.getTracks().forEach(t=>t.stop()); activeStream = null; } }
+
+function renderKioskHome(){
+  stopStream();
+  kioskEl.innerHTML = `
+    <div class="card">
+      <h2 style="margin:0 0 2px;font-size:19px;">Who's punching in?</h2>
+      <div class="hint">Tap your name to clock in or out.</div>
+      <div class="worker-grid" id="worker-grid"></div>
+    </div>
+  `;
+  document.getElementById('footer-note').innerHTML = hasBackend
+    ? `Connected to your Supabase project — punches and staff changes are saved for real and sync across devices.`
+    : `Running in local demo mode — data is saved in this browser only (persists across refreshes) until you connect Supabase.`;
+
+  const grid = document.getElementById('worker-grid');
+  if (!workers.length){
+    grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1;">No staff added yet — add someone from the Manager tab.</div>`;
+    return;
+  }
+  workers.forEach(w=>{
+    const tile = document.createElement('button');
+    tile.className = 'worker-tile';
+    const state = workerState(w.id);
+    const last = lastPunchToday(w.id);
+    const overLimit = state === 'break' && last && (Date.now() - new Date(last.timestamp)) / 60000 > MAX_BREAK_MINUTES;
+    tile.innerHTML = `<div class="avatar">${initials(w.name)}</div><div class="name">${w.name}</div><div class="status${overLimit ? ' over-limit' : ''}">${stateLabel(w.id)}</div>`;
+    tile.addEventListener('click', ()=>{
+      if (state === 'out') renderSelfieStep(w, 'In');
+      else if (state === 'break') quickPunch(w, 'Break End');
+      else renderActionChoice(w);
+    });
+    grid.appendChild(tile);
+  });
+}
+
+function renderActionChoice(worker){
+  kioskEl.innerHTML = `
+    <div class="card">
+      <div class="flow-header"><button class="back-btn" id="back-home">&larr; Cancel</button></div>
+      <h2 style="margin:0 0 4px;font-size:18px;">${worker.name} — What would you like to do?</h2>
+      <div class="hint">You're currently clocked in.</div>
+      <div class="choice-row">
+        <button class="punch-cta break" id="choose-break">Start break</button>
+        <button class="punch-cta out" id="choose-out">Clock out</button>
+      </div>
+    </div>
+  `;
+  document.getElementById('back-home').onclick = renderKioskHome;
+  document.getElementById('choose-break').onclick = ()=> quickPunch(worker, 'Break Start');
+  document.getElementById('choose-out').onclick = ()=> renderSelfieStep(worker, 'Out');
+}
+
+async function quickPunch(worker, type){
+  kioskEl.innerHTML = `
+    <div class="card center-text">
+      <div class="hint" style="margin-top:20px;">Saving…</div>
+    </div>
+  `;
+  await submitPunch(worker, type, null);
+  await loadPunches();
+  renderDoneStep(worker, type);
+}
+
+function stepDots(step){ return `<div class="step-dots"><div class="step-dot ${step>=1?'done':''}"></div><div class="step-dot ${step>=2?'done':''}"></div></div>`; }
+
+function ctaClass(type){ return type === 'In' ? 'in' : type === 'Out' ? 'out' : 'break'; }
+function actionLabel(type){
+  if (type === 'In') return 'clock in';
+  if (type === 'Out') return 'clock out';
+  if (type === 'Break Start') return 'start your break';
+  return 'end your break';
+}
+
+function renderSelfieStep(worker, type){
+  stopStream();
+  kioskEl.innerHTML = `
+    <div class="card">
+      <div class="flow-header"><button class="back-btn" id="back-home">&larr; Cancel</button>${stepDots(1)}</div>
+      <h2 style="margin:0 0 4px;font-size:18px;">${worker.name} — Take your selfie</h2>
+      <div class="hint">This confirms it's really you, about to ${actionLabel(type)}.</div>
+      <div class="video-box mirror" style="margin-top:14px;"><video id="selfie-video" playsinline autoplay muted></video></div>
+      <canvas id="selfie-canvas" style="display:none;"></canvas>
+      <div class="shutter-row"><button class="shutter" id="shutter-btn" aria-label="Take photo"></button></div>
+      <div id="selfie-status" class="hint center-text"></div>
+    </div>
+  `;
+  document.getElementById('back-home').onclick = renderKioskHome;
+  const video = document.getElementById('selfie-video');
+  const canvas = document.getElementById('selfie-canvas');
+
+  navigator.mediaDevices?.getUserMedia({ video: { facingMode: 'user' } })
+    .then(stream=>{ activeStream = stream; video.srcObject = stream; })
+    .catch(()=>{ document.getElementById('selfie-status').textContent = 'Camera unavailable here — using a placeholder photo instead.'; });
+
+  document.getElementById('shutter-btn').onclick = ()=>{
+    let dataUrl;
+    if (video.videoWidth){
+      canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+      canvas.getContext('2d').drawImage(video, 0, 0);
+      dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+    } else {
+      dataUrl = placeholderPhoto(worker.name, ctaClass(type) === 'in' ? '#f5a623' : '#e4572e');
+    }
+    renderConfirmStep(worker, type, dataUrl);
+  };
+}
+
+function renderConfirmStep(worker, type, photo){
+  stopStream();
+  const now = new Date();
+  kioskEl.innerHTML = `
+    <div class="card">
+      <div class="flow-header"><button class="back-btn" id="back-home">&larr; Cancel</button>${stepDots(2)}</div>
+      <h2 style="margin:0 0 4px;font-size:18px;">Confirm — ${actionLabel(type)}</h2>
+      <div class="confirm-summary">
+        <img src="${photo}" alt="">
+        <div class="meta"><div>${worker.name}</div><div class="t">${now.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</div><div style="color:var(--text-dim);">${now.toLocaleDateString([], {weekday:'short', month:'short', day:'numeric'})}</div></div>
+      </div>
+      <button class="punch-cta ${ctaClass(type)}" id="submit-punch">Confirm — ${actionLabel(type)}</button>
+      <button class="btn ghost" style="width:100%;margin-top:8px;" id="retake">Retake photo</button>
+    </div>
+  `;
+  document.getElementById('back-home').onclick = renderKioskHome;
+  document.getElementById('retake').onclick = ()=> renderSelfieStep(worker, type);
+  document.getElementById('submit-punch').onclick = async ()=>{
+    const btn = document.getElementById('submit-punch');
+    btn.disabled = true; btn.textContent = 'Saving…';
+    await submitPunch(worker, type, photo);
+    await loadPunches();
+    renderDoneStep(worker, type);
+  };
+}
+
+function renderDoneStep(worker, type){
+  const doneCopy = {
+    'In': `You're clocked in — see you at your break or end of shift.`,
+    'Break Start': `Enjoy your break — tap your name again when you're back.`,
+    'Break End': `Welcome back — you're clocked back in.`,
+    'Out': `You're clocked out — see you next time.`
+  };
+  kioskEl.innerHTML = `
+    <div class="card center-text">
+      <div class="done-check"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#06210f" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+      <h2 style="margin:6px 0 2px;font-size:18px;">${worker.name}</h2>
+      <div class="hint">${doneCopy[type] || 'Recorded.'}</div>
+      <button class="btn primary" style="margin-top:16px;" id="done-btn">Done</button>
+    </div>
+  `;
+  document.getElementById('done-btn').onclick = renderKioskHome;
+  setTimeout(()=>{ if (document.getElementById('done-btn')) renderKioskHome(); }, 4000);
+}
+
+// ================= MANAGER =================
+const managerEl = document.getElementById('manager-tab');
+let monthFilter = 'all';
+
+function pairShifts(list){
+  const byWorkerDay = {};
+  list.forEach(p=>{
+    const day = new Date(p.timestamp).toDateString();
+    const key = p.workerId + '|' + day;
+    (byWorkerDay[key] = byWorkerDay[key] || []).push(p);
+  });
+  const shifts = [];
+  Object.values(byWorkerDay).forEach(dayPunches=>{
+    dayPunches.sort((a,b)=> new Date(a.timestamp) - new Date(b.timestamp));
+    const clockIn = dayPunches.find(p=>p.type==='In');
+    const clockOut = [...dayPunches].reverse().find(p=>p.type==='Out');
+    const date = new Date(dayPunches[0].timestamp);
+
+    // sum up any break start/end pairs that day
+    let breakHours = 0, openBreakStart = null, breakIncomplete = false;
+    dayPunches.forEach(p=>{
+      if (p.type === 'Break Start') openBreakStart = new Date(p.timestamp);
+      else if (p.type === 'Break End' && openBreakStart){
+        breakHours += (new Date(p.timestamp) - openBreakStart) / 36e5;
+        openBreakStart = null;
+      }
+    });
+    if (openBreakStart) breakIncomplete = true; // started a break, never ended it
+    const overBreakLimit = (breakHours * 60) > MAX_BREAK_MINUTES + 0.5; // small buffer for rounding
+
+    let hours = null;
+    if (clockIn && clockOut){
+      hours = Math.round((((new Date(clockOut.timestamp) - new Date(clockIn.timestamp)) / 36e5) - breakHours) * 100) / 100;
+    }
+    shifts.push({
+      workerName: dayPunches[0].workerName, date,
+      timeIn: clockIn ? new Date(clockIn.timestamp) : null,
+      timeOut: clockOut ? new Date(clockOut.timestamp) : null,
+      breakHours: Math.round(breakHours * 100) / 100,
+      overBreakLimit,
+      hours, photoIn: clockIn?.photo, photoOut: clockOut?.photo,
+      incomplete: !clockIn || !clockOut || breakIncomplete
+    });
+  });
+  return shifts.sort((a,b)=> b.date - a.date);
+}
+function availableMonths(){
+  const set = new Set(punches.map(p=>{ const d = new Date(p.timestamp); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0'); }));
+  return [...set].sort().reverse();
+}
+function monthLabel(key){ const [y,m] = key.split('-').map(Number); return new Date(y, m-1, 1).toLocaleDateString([], { month:'long', year:'numeric' }); }
+
+async function renderManager(){
+  const months = availableMonths();
+  const filtered = monthFilter === 'all' ? punches : punches.filter(p=>{ const d = new Date(p.timestamp); return (d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0')) === monthFilter; });
+  const shifts = pairShifts(filtered);
+  const totalHours = shifts.reduce((s,sh)=> s + (sh.hours || 0), 0);
+  const incompleteCount = shifts.filter(s=>s.incomplete).length;
+
+  managerEl.innerHTML = `
+    <div class="stats-row">
+      <div class="stat"><div class="label">Total hours</div><div class="value">${totalHours.toFixed(1)}</div></div>
+      <div class="stat"><div class="label">Shifts logged</div><div class="value">${shifts.length}</div></div>
+      <div class="stat"><div class="label">Active staff</div><div class="value">${workers.length}</div></div>
+      <div class="stat"><div class="label">Missing punches</div><div class="value" style="color:${incompleteCount? 'var(--out)':'var(--text)'};">${incompleteCount}</div></div>
+    </div>
+
+    <div style="text-align:right;margin-bottom:10px;">
+      <button class="btn small" id="lock-btn">Lock manager view</button>
+    </div>
+
+    <div class="card">
+      <div class="section-title"><h3>Staff</h3></div>
+      <div class="staff-list" id="staff-list"></div>
+      <div class="field-row" style="margin-top:12px;">
+        <input type="text" id="new-worker-name" placeholder="Add a staff member's name">
+        <button class="btn primary" id="add-worker-btn">Add</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="table-toolbar">
+        <select id="month-filter">
+          <option value="all">All time</option>
+          ${months.map(m=>`<option value="${m}" ${m===monthFilter?'selected':''}>${monthLabel(m)}</option>`).join('')}
+        </select>
+        <button class="btn primary" id="export-btn" style="margin-left:auto;">Export to Excel</button>
+        ${monthFilter !== 'all' ? `<button class="btn danger" id="clear-month-btn">Clear this month</button>` : ''}
+      </div>
+      <div class="table-scroll">
+        ${shifts.length ? `
+        <table>
+          <thead><tr><th>Worker</th><th>Date</th><th>Time in</th><th>Time out</th><th>Break</th><th>Hours</th><th>Photos</th><th>Status</th></tr></thead>
+          <tbody>
+            ${shifts.map(s=>`
+              <tr>
+                <td>${s.workerName}</td>
+                <td>${s.date.toLocaleDateString([], {month:'short', day:'numeric'})}</td>
+                <td>${s.timeIn ? s.timeIn.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) : '—'}</td>
+                <td>${s.timeOut ? s.timeOut.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) : '—'}</td>
+                <td>${s.breakHours ? s.breakHours + 'h' : '—'}${s.overBreakLimit ? ' <span class="badge warn">Over 30min</span>' : ''}</td>
+                <td>${s.hours ?? '—'}</td>
+                <td><div class="thumb-pair">${s.photoIn?`<img src="${s.photoIn}">`:''}${s.photoOut?`<img src="${s.photoOut}">`:''}</div></td>
+                <td>${s.incomplete ? '<span class="badge warn">Missing punch</span>' : '<span class="badge ok">Complete</span>'}</td>
+              </tr>`).join('')}
+          </tbody>
+        </table>` : `<div class="empty-state">No punches yet for this period.</div>`}
+      </div>
+    </div>
+  `;
+
+  const staffList = document.getElementById('staff-list');
+  if (!workers.length) staffList.innerHTML = `<div class="empty-state">No staff yet — add one below.</div>`;
+  workers.forEach(w=>{
+    const row = document.createElement('div');
+    row.className = 'staff-row';
+    row.innerHTML = `<div class="avatar" style="width:30px;height:30px;font-size:12px;">${initials(w.name)}</div><div class="name">${w.name}</div><button class="btn small danger" data-id="${w.id}">Remove</button>`;
+    row.querySelector('button').onclick = async (e)=>{
+      if (!confirm(`Remove ${w.name}? Their past punch history stays on record.`)) return;
+      await removeWorker(w.id);
+      await loadWorkers();
+      renderManager(); renderKioskHome();
+    };
+    staffList.appendChild(row);
+  });
+  document.getElementById('add-worker-btn').onclick = async ()=>{
+    const input = document.getElementById('new-worker-name');
+    const name = input.value.trim();
+    if (!name) { input.focus(); return; }
+    try {
+      await addWorker(name);
+      await loadWorkers();
+      input.value = '';
+      renderManager(); renderKioskHome();
+    } catch(e) { /* alert already shown inside addWorker */ }
+  };
+  document.getElementById('month-filter').onchange = (e)=>{ monthFilter = e.target.value; renderManager(); };
+  document.getElementById('export-btn').onclick = ()=> exportExcel(shifts);
+  document.getElementById('lock-btn').onclick = ()=>{ setManagerUnlocked(false); renderManagerGate(); };
+  const clearBtn = document.getElementById('clear-month-btn');
+  if (clearBtn) clearBtn.onclick = async ()=>{
+    const label = monthLabel(monthFilter);
+    if (!confirm(`Delete all punches and selfies for ${label}? Make sure you've already exported the Excel file — this can't be undone.`)) return;
+    clearBtn.disabled = true; clearBtn.textContent = 'Deleting…';
+    const count = await clearMonth(monthFilter);
+    await loadPunches();
+    monthFilter = 'all';
+    renderManager();
+    alert(`Deleted ${count} punch record(s) for ${label}.`);
+  };
+}
+
+function exportExcel(shifts){
+  const rows = shifts.map(s=>({ Worker: s.workerName, Date: s.date.toLocaleDateString(), 'Time In': s.timeIn ? s.timeIn.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) : '', 'Time Out': s.timeOut ? s.timeOut.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) : '', 'Break (hrs)': s.breakHours || 0, 'Over 30min Break': s.overBreakLimit ? 'Yes' : '', 'Hours Worked': s.hours ?? '', Status: s.incomplete ? 'Missing punch' : 'Complete' }));
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.json_to_sheet(rows);
+  ws['!cols'] = [{wch:14},{wch:12},{wch:10},{wch:10},{wch:10},{wch:16},{wch:12},{wch:14}];
+  XLSX.utils.book_append_sheet(wb, ws, 'Attendance');
+  XLSX.writeFile(wb, `station-attendance-${monthFilter === 'all' ? 'all-time' : monthFilter}.xlsx`);
+}
+
+async function clearMonth(monthKey){
+  const [y, m] = monthKey.split('-').map(Number);
+  const start = new Date(y, m-1, 1);
+  const end = new Date(y, m, 1);
+
+  if (!sb){
+    const toDelete = localPunches.filter(p => new Date(p.timestamp) >= start && new Date(p.timestamp) < end);
+    localPunches = localPunches.filter(p => !(new Date(p.timestamp) >= start && new Date(p.timestamp) < end));
+    saveLocalStore();
+    return toDelete.length;
+  }
+
+  const { data: rows, error: selErr } = await sb.from('punches').select('id, photo_path')
+    .gte('created_at', start.toISOString()).lt('created_at', end.toISOString());
+  if (selErr || !rows) return 0;
+
+  const paths = rows.map(r => r.photo_path).filter(Boolean);
+  if (paths.length) await sb.storage.from('selfies').remove(paths);
+
+  const ids = rows.map(r => r.id);
+  if (ids.length) await sb.from('punches').delete().in('id', ids);
+  return rows.length;
+}
+async function init(){
+  const badge = document.getElementById('conn-badge');
+  await loadWorkers();
+  await loadPunches();
+  if (hasBackend){
+    badge.textContent = 'connected'; badge.className = 'conn-badge ok';
+    const refreshVisibleTab = ()=>{
+      const managerVisible = document.getElementById('manager-tab').style.display !== 'none';
+      if (managerVisible) renderManagerGate(); else renderKioskHome();
+    };
+    sb.channel('workers-changes').on('postgres_changes', { event: '*', schema: 'public', table: 'workers' }, async ()=>{ await loadWorkers(); refreshVisibleTab(); }).subscribe();
+    sb.channel('punches-changes').on('postgres_changes', { event: '*', schema: 'public', table: 'punches' }, async ()=>{ await loadPunches(); refreshVisibleTab(); }).subscribe();
+  } else {
+    badge.textContent = 'local demo'; badge.className = 'conn-badge bad';
+  }
+  renderKioskHome();
+}
+init();
+
+// keep the on-break countdown/overtime label fresh even with no new punches
+setInterval(()=>{
+  const kioskVisible = document.getElementById('kiosk-tab').style.display !== 'none';
+  const onHomeScreen = document.getElementById('worker-grid');
+  if (kioskVisible && onHomeScreen) renderKioskHome();
+}, 30000);
+
+})();
+</script>
+</body>
+</html>
