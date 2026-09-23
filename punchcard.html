@@ -336,9 +336,6 @@ function renderKioskHome(){
       <div class="worker-grid" id="worker-grid"></div>
     </div>
   `;
-  document.getElementById('footer-note').innerHTML = hasBackend
-    ? `Connected to your Supabase project — punches and staff changes are saved for real and sync across devices.`
-    : `Running in local demo mode — data is saved in this browser only (persists across refreshes) until you connect Supabase.`;
 
   const grid = document.getElementById('worker-grid');
   if (!workers.length){
