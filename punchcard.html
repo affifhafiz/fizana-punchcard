@@ -140,12 +140,12 @@
 <div class="topbar">
   <div class="brand"><span class="dot"></span><span class="full">Fizana Empire</span><span class="conn-badge" id="conn-badge">checking…</span></div>
   <div class="tabs">
-    <button class="tab active" data-tab="kiosk">Kiosk</button>
+    <button class="tab active" data-tab="staff">Staff</button>
     <button class="tab" data-tab="manager">Manager</button>
   </div>
 </div>
 
-<div id="kiosk-tab" class="wrap"></div>
+<div id="staff-tab" class="wrap"></div>
 <div id="manager-tab" class="wrap wide" style="display:none;"></div>
 <div class="footer-note" id="footer-note"></div>
 
@@ -322,14 +322,14 @@ function renderManagerGate(){
   input.focus();
 }
 
-// ================= KIOSK =================
-const kioskEl = document.getElementById('kiosk-tab');
+// ================= STAFF =================
+const staffEl = document.getElementById('staff-tab');
 let activeStream = null;
 function stopStream(){ if (activeStream){ activeStream.getTracks().forEach(t=>t.stop()); activeStream = null; } }
 
-function renderKioskHome(){
+function renderStaffHome(){
   stopStream();
-  kioskEl.innerHTML = `
+  staffEl.innerHTML = `
     <div class="card">
       <h2 style="margin:0 0 2px;font-size:19px;">Who's punching in?</h2>
       <div class="hint">Tap your name to clock in or out.</div>
@@ -370,13 +370,13 @@ function renderActionChoice(worker){
       </div>
     </div>
   `;
-  document.getElementById('back-home').onclick = renderKioskHome;
+  document.getElementById('back-home').onclick = renderStaffHome;
   document.getElementById('choose-break').onclick = ()=> quickPunch(worker, 'Break Start');
   document.getElementById('choose-out').onclick = ()=> renderSelfieStep(worker, 'Out');
 }
 
 async function quickPunch(worker, type){
-  kioskEl.innerHTML = `
+  staffEl.innerHTML = `
     <div class="card center-text">
       <div class="hint" style="margin-top:20px;">Saving…</div>
     </div>
@@ -398,7 +398,7 @@ function actionLabel(type){
 
 function renderSelfieStep(worker, type){
   stopStream();
-  kioskEl.innerHTML = `
+  staffEl.innerHTML = `
     <div class="card">
       <div class="flow-header"><button class="back-btn" id="back-home">&larr; Cancel</button>${stepDots(1)}</div>
       <h2 style="margin:0 0 4px;font-size:18px;">${worker.name} — Take your selfie</h2>
@@ -409,7 +409,7 @@ function renderSelfieStep(worker, type){
       <div id="selfie-status" class="hint center-text"></div>
     </div>
   `;
-  document.getElementById('back-home').onclick = renderKioskHome;
+  document.getElementById('back-home').onclick = renderStaffHome;
   const video = document.getElementById('selfie-video');
   const canvas = document.getElementById('selfie-canvas');
 
@@ -433,7 +433,7 @@ function renderSelfieStep(worker, type){
 function renderConfirmStep(worker, type, photo){
   stopStream();
   const now = new Date();
-  kioskEl.innerHTML = `
+  staffEl.innerHTML = `
     <div class="card">
       <div class="flow-header"><button class="back-btn" id="back-home">&larr; Cancel</button>${stepDots(2)}</div>
       <h2 style="margin:0 0 4px;font-size:18px;">Confirm — ${actionLabel(type)}</h2>
@@ -445,7 +445,7 @@ function renderConfirmStep(worker, type, photo){
       <button class="btn ghost" style="width:100%;margin-top:8px;" id="retake">Retake photo</button>
     </div>
   `;
-  document.getElementById('back-home').onclick = renderKioskHome;
+  document.getElementById('back-home').onclick = renderStaffHome;
   document.getElementById('retake').onclick = ()=> renderSelfieStep(worker, type);
   document.getElementById('submit-punch').onclick = async ()=>{
     const btn = document.getElementById('submit-punch');
@@ -463,7 +463,7 @@ function renderDoneStep(worker, type){
     'Break End': `Welcome back — you're clocked back in.`,
     'Out': `You're clocked out — see you next time.`
   };
-  kioskEl.innerHTML = `
+  staffEl.innerHTML = `
     <div class="card center-text">
       <div class="done-check"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#06210f" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
       <h2 style="margin:6px 0 2px;font-size:18px;">${worker.name}</h2>
@@ -471,8 +471,8 @@ function renderDoneStep(worker, type){
       <button class="btn primary" style="margin-top:16px;" id="done-btn">Done</button>
     </div>
   `;
-  document.getElementById('done-btn').onclick = renderKioskHome;
-  setTimeout(()=>{ if (document.getElementById('done-btn')) renderKioskHome(); }, 4000);
+  document.getElementById('done-btn').onclick = renderStaffHome;
+  setTimeout(()=>{ if (document.getElementById('done-btn')) renderStaffHome(); }, 4000);
 }
 
 // ================= MANAGER =================
