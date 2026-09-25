@@ -596,7 +596,7 @@ async function renderManager(){
       if (!confirm(`Remove ${w.name}? Their past punch history stays on record.`)) return;
       await removeWorker(w.id);
       await loadWorkers();
-      renderManager(); renderKioskHome();
+      renderManager(); renderStaffHome();
     };
     staffList.appendChild(row);
   });
@@ -608,7 +608,7 @@ async function renderManager(){
       await addWorker(name);
       await loadWorkers();
       input.value = '';
-      renderManager(); renderKioskHome();
+      renderManager(); renderStaffHome();
     } catch(e) { /* alert already shown inside addWorker */ }
   };
   document.getElementById('month-filter').onchange = (e)=>{ monthFilter = e.target.value; renderManager(); };
@@ -667,7 +667,7 @@ async function init(){
     badge.textContent = 'connected'; badge.className = 'conn-badge ok';
     const refreshVisibleTab = ()=>{
       const managerVisible = document.getElementById('manager-tab').style.display !== 'none';
-      if (managerVisible) renderManagerGate(); else renderKioskHome();
+      if (managerVisible) renderManagerGate(); else renderStaffHome();
     };
     sb.channel('workers-changes').on('postgres_changes', { event: '*', schema: 'public', table: 'workers' }, async ()=>{ await loadWorkers(); refreshVisibleTab(); }).subscribe();
     sb.channel('punches-changes').on('postgres_changes', { event: '*', schema: 'public', table: 'punches' }, async ()=>{ await loadPunches(); refreshVisibleTab(); }).subscribe();
@@ -680,9 +680,9 @@ init();
 
 // keep the on-break countdown/overtime label fresh even with no new punches
 setInterval(()=>{
-  const kioskVisible = document.getElementById('kiosk-tab').style.display !== 'none';
+  const staffVisible = document.getElementById('staff-tab').style.display !== 'none';
   const onHomeScreen = document.getElementById('worker-grid');
-  if (kioskVisible && onHomeScreen) renderKioskHome();
+  if (staffVisible && onHomeScreen) renderStaffHome();
 }, 30000);
 
 })();
