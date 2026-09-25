@@ -224,12 +224,12 @@ async function loadPunches(){
   punches = error ? [] : data.map(p => ({ ...p, timestamp: p.created_at, photo: p.photo_url, photoPath: p.photo_path, workerId: p.worker_id, workerName: p.worker_name }));
 }
 async function addWorker(name){
-  if (!sb){ localWorkers.push({ id: 'w'+Date.now(), name, active: true }); saveLocalStore(); await loadWorkers(); renderKioskHome(); renderManager(); return; }
+  if (!sb){ localWorkers.push({ id: 'w'+Date.now(), name, active: true }); saveLocalStore(); await loadWorkers(); renderStaffHome(); renderManager(); return; }
   const { error } = await sb.from('workers').insert({ name, active: true });
   if (error) { alert('Could not add staff member: ' + error.message); throw error; }
 }
 async function removeWorker(id){
-  if (!sb){ const w = localWorkers.find(w=>w.id===id); if (w) w.active = false; saveLocalStore(); await loadWorkers(); renderKioskHome(); renderManager(); return; }
+  if (!sb){ const w = localWorkers.find(w=>w.id===id); if (w) w.active = false; saveLocalStore(); await loadWorkers(); renderStaffHome(); renderManager(); return; }
   const { error } = await sb.from('workers').update({ active: false }).eq('id', id);
   if (error) alert('Could not remove staff member: ' + error.message);
 }
@@ -286,10 +286,10 @@ document.querySelectorAll('.tab').forEach(btn=>{
     document.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));
     btn.classList.add('active');
     const tab = btn.dataset.tab;
-    document.getElementById('kiosk-tab').style.display = tab === 'kiosk' ? '' : 'none';
+    document.getElementById('staff-tab').style.display = tab === 'staff' ? '' : 'none';
     document.getElementById('manager-tab').style.display = tab === 'manager' ? '' : 'none';
-    document.getElementById('footer-note').style.display = tab === 'kiosk' ? '' : 'none';
-    if (tab === 'kiosk') renderKioskHome(); else renderManagerGate();
+    document.getElementById('footer-note').style.display = tab === 'staff' ? '' : 'none';
+    if (tab === 'staff') renderStaffHome(); else renderManagerGate();
   });
 });
 
