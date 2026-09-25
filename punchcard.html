@@ -336,6 +336,9 @@ function renderStaffHome(){
       <div class="worker-grid" id="worker-grid"></div>
     </div>
   `;
+  document.getElementById('footer-note').innerHTML = hasBackend
+    ? `Connected to your Supabase project — punches and staff changes are saved for real and sync across devices.`
+    : `Running in local demo mode — data is saved in this browser only (persists across refreshes) until you connect Supabase.`;
 
   const grid = document.getElementById('worker-grid');
   if (!workers.length){
@@ -359,7 +362,7 @@ function renderStaffHome(){
 }
 
 function renderActionChoice(worker){
-  kioskEl.innerHTML = `
+  staffEl.innerHTML = `
     <div class="card">
       <div class="flow-header"><button class="back-btn" id="back-home">&larr; Cancel</button></div>
       <h2 style="margin:0 0 4px;font-size:18px;">${worker.name} — What would you like to do?</h2>
@@ -674,7 +677,7 @@ async function init(){
   } else {
     badge.textContent = 'local demo'; badge.className = 'conn-badge bad';
   }
-  renderKioskHome();
+  renderStaffHome();
 }
 init();
 
